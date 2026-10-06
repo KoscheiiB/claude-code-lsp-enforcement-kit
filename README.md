@@ -258,6 +258,8 @@ Same detection logic, but for `Bash(grep "UserService" src/)`, `Bash(rg handleSu
 
 Allows: `git grep` (history search), non-code paths, non-code file type filters.
 
+Each grep/rg/ag/ack invocation is parsed with that tool's own option table (`hooks/lib/grep-command.js`) and judged on its own, including ones inside `$(...)`, backticks, heredocs, `sh -c`, `xargs` and `find -exec`. An option the tables do not know makes the guard treat every word of that invocation as a possible pattern, and any grep mention the parser does not account for (inside `ssh host "..."`, an unknown wrapper, text it cannot tokenize) gets the regex check the guard used before.
+
 ### 4. `lsp-first-read-guard.js` — Progressive Read Gate
 
 **Hook type:** PreToolUse | **Matcher:** `Read`
