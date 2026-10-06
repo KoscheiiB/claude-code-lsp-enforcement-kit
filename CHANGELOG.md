@@ -16,6 +16,7 @@ All notable changes to the LSP Enforcement Kit. Format based on [Keep a Changelo
   - greps inside `bash -c`, heredocs fed to a shell, and `$(...)`, and `egrep`/`fgrep`.
 
   An option the tables do not know makes the guard treat every word of that invocation as a possible pattern. Any grep mention the parser does not account for (inside `ssh host "..."`, `docker exec`, an unknown wrapper, text it cannot tokenize) gets the previous regex check at that spot, so the parse only ever refines a decision about text it understood.
+- **Listing, count and quiet greps are no longer blocked.** `bash-grep-block.js` skips invocations with `-l`, `-L`, `-c`, `-q` or their long forms (per tool: rg's `-L` is `--follow` and stays guarded; options count wherever they appear before `--`, as all four tools read them), and `lsp-first-guard.js` skips `output_mode` `files_with_matches` (the Grep default) and `count`. Their output is file paths or numbers, so there is no output for LSP to shrink, and "which files mention X" has no LSP equivalent. Both block messages now name that route.
 - **Exempt paths without a leading slash.** `grep -rn X node_modules/` was blocked because the exemption required `/` before `node_modules`; exempt paths are now matched per operand.
 
 ## [2.3.2] — 2026-04-14

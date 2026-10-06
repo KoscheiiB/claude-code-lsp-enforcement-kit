@@ -44,6 +44,10 @@ process.stdin.on('end', () => {
       patterns.push(...inv.words.map(w => w.text));
       continue;
     }
+    // -l, -c, -q and friends print file names, counts or nothing, never
+    // matched lines: there is no output for LSP to shrink, and "which files
+    // mention X" has no LSP call.
+    if (inv.listing) continue;
     if (searchesOnlyExemptPaths(inv)) continue;
     patterns.push(...inv.patterns);
   }
@@ -99,6 +103,10 @@ process.stdin.on('end', () => {
   // targeting non-code files AND doesn't touch code paths.
   if (hasNonCodeTarget && !targetsCode) process.exit(0);
 
+  // Listing is allowed (see above), so say so: without this line the block
+  // leaves no way to ask "which files mention X".
+  const listingHint = 'Only need the files that mention it? grep -l lists them and is not blocked.';
+
   const suggestions = symbols.map(sym => {
     const intent = /^[A-Z]/.test(sym) ? 'symbol_search' : 'references';
     return `  ${sym}:\n${buildSuggestion(sym, intent, '    ')}`;
@@ -106,7 +114,7 @@ process.stdin.on('end', () => {
 
   process.stderr.write(
     `\n⛔ LSP-FIRST: Blocked grep/rg — found ${symbols.length} code symbol(s): ${symbols.join(', ')}\n` +
-    `LSP is always connected. Use:\n${suggestions}\n\n`
+    `LSP is always connected. Use:\n${suggestions}\n${listingHint}\n\n`
   );
 
   const intent = /^[A-Z]/.test(symbols[0]) ? 'symbol_search' : 'references';
@@ -114,7 +122,7 @@ process.stdin.on('end', () => {
     hook: 'bash-grep-block',
     symbols,
     intent,
-    reason: `LSP-FIRST: Pattern contains code symbols [${symbols.join(', ')}]. Use LSP:\n${suggestions}`,
+    reason: `LSP-FIRST: Pattern contains code symbols [${symbols.join(', ')}]. Use LSP:\n${suggestions}\n${listingHint}`,
   })));
 });
 

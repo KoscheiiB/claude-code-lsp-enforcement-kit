@@ -202,6 +202,8 @@ Detection reads user-level Claude Code config (`~/.claude.json`, `~/.claude/sett
 
 Intercepts every Grep call. Detects code symbols in the pattern. Blocks with a suggestion to use the correct LSP tool.
 
+Only `output_mode: "content"` is guarded. `files_with_matches` (the default) and `count` return file paths or numbers, never matched lines, so there is no output for LSP to shrink, and "which files mention X" has no LSP equivalent.
+
 | Pattern | Detected as | Action |
 |---------|------------|--------|
 | `getUserById` | camelCase symbol | BLOCK |
@@ -256,7 +258,7 @@ The guard parses the glob pattern, extracts alphabetic tokens, and blocks if any
 
 Same detection logic, but for `Bash(grep "UserService" src/)`, `Bash(rg handleSubmit)`, etc. Claude sometimes tries to bypass the Grep hook by shelling out.
 
-Allows: `git grep` (history search), non-code paths, non-code file type filters.
+Allows: `git grep` (history search), non-code paths, non-code file type filters, and invocations that print no matched lines: `-l`, `-L`, `-c`, `-q` and their long forms, per tool (rg's `-L` is `--follow` and stays guarded), wherever they appear before `--`, plus `rg --files`, `ag -g` and `ack -f`.
 
 Each grep/rg/ag/ack invocation is parsed with that tool's own option table (`hooks/lib/grep-command.js`) and judged on its own, including ones inside `$(...)`, backticks, heredocs, `sh -c`, `xargs` and `find -exec`. An option the tables do not know makes the guard treat every word of that invocation as a possible pattern, and any grep mention the parser does not account for (inside `ssh host "..."`, an unknown wrapper, text it cannot tokenize) gets the regex check the guard used before.
 

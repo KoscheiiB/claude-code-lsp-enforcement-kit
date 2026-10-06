@@ -22,6 +22,12 @@ process.stdin.on('end', () => {
   const searchPath = String(params.path ?? '');
   const glob    = String(params.glob ?? '');
 
+  // files_with_matches (the Grep tool's default) and count return paths or
+  // numbers, never matched lines, so there is no output for LSP to shrink,
+  // and "which files mention X" has no LSP call. Unknown modes stay guarded.
+  const outputMode = String(params.output_mode ?? 'files_with_matches');
+  if (outputMode === 'files_with_matches' || outputMode === 'count') process.exit(0);
+
   if (/knowledge-vault|\.task[\\/]|\.claude[\\/]|node_modules|logs?[\\/]|docs?[\\/]|supabase[\\/]migrations/i.test(searchPath)) {
     process.exit(0);
   }
@@ -40,6 +46,10 @@ process.stdin.on('end', () => {
 
   if (symbolParts.length === 0) process.exit(0);
 
+  // files_with_matches is allowed (see above), so say so: without this line
+  // the block leaves no way to ask "which files mention X".
+  const listingHint = 'Only need the files that mention it? output_mode "files_with_matches" (the default) lists them and is not blocked.';
+
   const suggestions = symbolParts.map(sym => {
     const intent = /^[A-Z]/.test(sym) ? 'symbol_search' : 'references';
     return `  ${sym}:\n${buildSuggestion(sym, intent, '    ')}`;
@@ -47,7 +57,7 @@ process.stdin.on('end', () => {
 
   process.stderr.write(
     `\n⛔ LSP-FIRST BLOCK: ${symbolParts.length} code symbol(s) in Grep — use LSP instead\n` +
-    `Symbols: ${symbolParts.join(', ')}\nLSP tools:\n${suggestions}\n\n`
+    `Symbols: ${symbolParts.join(', ')}\nLSP tools:\n${suggestions}\n${listingHint}\n\n`
   );
 
   // Emit structured JSON for programmatic consumers (monitoring, dashboards, IDE plugins).
@@ -57,7 +67,7 @@ process.stdin.on('end', () => {
     hook: 'lsp-first-guard',
     symbols: symbolParts,
     intent,
-    reason: `LSP-FIRST: Pattern contains code symbol(s) [${symbolParts.join(', ')}]. Use LSP tools:\n${suggestions}`,
+    reason: `LSP-FIRST: Pattern contains code symbol(s) [${symbolParts.join(', ')}]. Use LSP tools:\n${suggestions}\n${listingHint}`,
   })));
 });
 
