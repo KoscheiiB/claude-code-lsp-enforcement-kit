@@ -6,9 +6,11 @@
 // Suggests LSP equivalent for the active provider (cclsp / Serena / ...).
 // Allows: git grep, non-code paths, non-code file types.
 
+const fs = require('fs');
 const path = require('path');
 const { buildSuggestion, buildStructuredBlockResponse } = require('./lib/detect-lsp-provider');
 const { parseCommand } = require('./lib/grep-command');
+const { isNonCodeTarget } = require('./lib/code-files');
 
 // Zero-width / formatting chars that would split tokens invisibly and
 // bypass ASCII regex symbol detection.
@@ -49,6 +51,9 @@ process.stdin.on('end', () => {
     // mention X" has no LSP call.
     if (inv.listing) continue;
     if (searchesOnlyExemptPaths(inv)) continue;
+    // Every target a non-code file (LaTeX, BibTeX, CSV, ...): no LSP indexes
+    // those, so the suggested LSP call cannot answer.
+    if (searchesOnlyNonCode(inv, data.cwd)) continue;
     patterns.push(...inv.patterns);
   }
   // A grep mention no parsed invocation accounts for (inside `ssh host "..."`,
@@ -134,6 +139,30 @@ function searchesOnlyExemptPaths(inv) {
   return !inv.extraOperands &&
     inv.operands.length > 0 &&
     inv.operands.every(w => !w.dynamic && EXEMPT_PATH.test(path.posix.normalize(w.text.replace(/\\/g, '/'))));
+}
+
+// True only on positive evidence that the invocation reads no code: every
+// operand is a non-code file, or every --include/-g filter is non-code and
+// it applies to every operand. grep applies --include to the files it is
+// given; rg applies -g only inside directories it walks, so for rg every
+// operand must be a directory. No operands means stdin or the whole tree,
+// so that never counts. An operand that exists as a directory is never a
+// non-code file, whatever its name ends in (vendor/golang.org).
+function searchesOnlyNonCode(inv, cwd) {
+  const ops = inv.operands;
+  if (inv.extraOperands || ops.length === 0 || ops.some(w => w.dynamic || w.text === '-')) return false;
+  if (ops.every(w => isNonCodeTarget(w.text) && !isDirectory(w.text, cwd))) return true;
+  if (inv.includes.length === 0 || !inv.includes.every(g => g !== null && isNonCodeTarget(g))) return false;
+  if (inv.tool === 'grep') return true;
+  return ops.every(w => /^\.\.?$|[\\/]$/.test(w.text));
+}
+
+function isDirectory(p, cwd) {
+  try {
+    return fs.statSync(path.resolve(String(cwd || process.cwd()), p)).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 const LEGACY_WINDOW = 4096;

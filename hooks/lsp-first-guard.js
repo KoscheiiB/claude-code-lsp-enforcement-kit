@@ -4,7 +4,10 @@
 // lsp-first-guard.js — PreToolUse hook (matcher: Grep)
 // Blocks Grep on code symbols. Suggests LSP equivalent for the active provider.
 
+const fs = require('fs');
+const path = require('path');
 const { buildSuggestion, buildStructuredBlockResponse } = require('./lib/detect-lsp-provider');
+const { isNonCodeTarget, isNonCodeType } = require('./lib/code-files');
 
 let raw = '';
 process.stdin.setEncoding('utf8');
@@ -35,6 +38,10 @@ process.stdin.on('end', () => {
   if (/\.(md|txt|log|json|jsonc|yaml|yml|env|csv|toml|xml|sql|sh|css|scss)/i.test(glob)) {
     process.exit(0);
   }
+
+  // A search confined to non-code files: no LSP indexes them, so the
+  // suggested call cannot answer it.
+  if (searchesOnlyNonCode(searchPath, glob, params.type, data.cwd)) process.exit(0);
 
   if (pattern.length < 4) process.exit(0);
 
@@ -70,6 +77,26 @@ process.stdin.on('end', () => {
     reason: `LSP-FIRST: Pattern contains code symbol(s) [${symbolParts.join(', ')}]. Use LSP tools:\n${suggestions}\n${listingHint}`,
   })));
 });
+
+// The Grep tool runs rg. rg searches a file named as the path whatever the
+// glob or type say, so a non-code glob or type only confines the search when
+// the path is a directory (or absent: the working directory). Every filter
+// given must be non-code. Anything unknown counts as code.
+function searchesOnlyNonCode(searchPath, glob, type, cwd) {
+  if (searchPath && !isDirectory(searchPath, cwd)) return isNonCodeTarget(searchPath);
+  const filters = [];
+  if (glob) filters.push(isNonCodeTarget(glob));
+  if (type !== undefined && type !== null && type !== '') filters.push(isNonCodeType(type));
+  return filters.length > 0 && filters.every(Boolean);
+}
+
+function isDirectory(p, cwd) {
+  try {
+    return fs.statSync(path.resolve(String(cwd || process.cwd()), p)).isDirectory();
+  } catch {
+    return false;
+  }
+}
 
 function isCodeSymbol(s) {
   if (s.length < 4) return false;
