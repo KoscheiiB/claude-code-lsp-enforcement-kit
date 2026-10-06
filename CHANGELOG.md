@@ -4,6 +4,9 @@ All notable changes to the LSP Enforcement Kit. Format based on [Keep a Changelo
 
 ## [Unreleased]
 
+### Added
+- `test/`: a zero-dependency `node:test` suite for the grep guards. Run it with `node --test test/*.test.js`.
+
 ## [2.3.2] — 2026-04-14
 
 ### Added
